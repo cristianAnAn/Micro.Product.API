@@ -1,81 +1,37 @@
-using AutoMapper;
-using Micro.Product.API.Data;
-using Micro.Product.API.Extensions;
-using Micro.Product.API;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.OpenApi.Models;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
-
-var builder = WebApplication.CreateBuilder(args);
-
-builder.Services.AddControllers().AddJsonOptions(
-    opts =>
-    opts.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles
-    );
-
-// Add services to the container.
-
-//builder.Services.AddControllers();
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddDbContext<AppDbContext>(option =>
+namespace Micro.Product.API.Extensions
 {
-    option.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
-});
-IMapper mapper = MappingConfig.RegisterMaps().CreateMapper();
-builder.Services.AddSingleton(mapper);
-builder.Services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(option =>
-{
-    option.AddSecurityDefinition(JwtBearerDefaults.AuthenticationScheme, new OpenApiSecurityScheme
+    public static class WebApplicationBuilderExtensions
     {
-        Name = "Authorization",
-        Description = "Enter the Bearer Authorization string as following: 'Bearer...'",
-        In = ParameterLocation.Header,
-        Type = SecuritySchemeType.ApiKey,
-        Scheme = "Bearer"
-    });
-
-    option.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
+        public static WebApplicationBuilder AddAppAuthentication(this WebApplicationBuilder builder)
         {
-            new OpenApiSecurityScheme
+            var settingsSection = builder.Configuration.GetSection("ApiSettings");
+
+            var secret = settingsSection.GetValue<string>("JwtOptions:Secret");
+            var issuer = settingsSection.GetValue<string>("Issuer");
+            var audience = settingsSection.GetValue<string>("Audience");
+            var key = Encoding.ASCII.GetBytes(secret);
+
+            builder.Services.AddAuthentication(x =>
             {
-                Reference = new OpenApiReference
+                x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                x.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            }).AddJwtBearer(x =>
+            {
+                x.TokenValidationParameters = new TokenValidationParameters
                 {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = JwtBearerDefaults.AuthenticationScheme
-                }
-            },
-            new List<string>()
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(key),
+                    ValidateIssuer = true,
+                    ValidIssuer = issuer,
+                    ValidAudience = audience,
+                    ValidateAudience = true,
+                };
+            });
+            return builder;
         }
-    });
-});
-builder.Services.AddOpenApi();
-builder.AddAppAuthetication();
-builder.Services.AddAuthorization();
-
-var app = builder.Build();
-
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseDeveloperExceptionPage();
-    //app.MapOpenApi();
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "Producto API V1");
-    });
+    }
 }
-
-app.UseHttpsRedirection();
-app.UseAuthentication();
-app.UseAuthorization();
-app.UseStaticFiles();
-
-app.MapControllers();
-//ApplyMigration();
-
-app.Run();

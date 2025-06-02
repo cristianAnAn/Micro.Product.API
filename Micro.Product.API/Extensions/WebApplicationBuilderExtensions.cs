@@ -1,19 +1,20 @@
-﻿using System.Text;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
+﻿using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 namespace Micro.Product.API.Extensions
 {
     public static class WebApplicationBuilderExtensions
     {
-        public static WebApplicationBuilder AddAppAuthetication(this WebApplicationBuilder builder)
+        public static WebApplicationBuilder AddAppAuthentication(this WebApplicationBuilder builder)
         {
-            var settingsSection = builder.Configuration.GetSection("AppSettings");
+            var settingsSection = builder.Configuration.GetSection("ApiSettings");
+
             var secret = settingsSection.GetValue<string>("JwtOptions:Secret");
             var issuer = settingsSection.GetValue<string>("Issuer");
             var audience = settingsSection.GetValue<string>("Audience");
-
             var key = Encoding.ASCII.GetBytes(secret);
+
             builder.Services.AddAuthentication(x =>
             {
                 x.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -27,18 +28,10 @@ namespace Micro.Product.API.Extensions
                     ValidateIssuer = true,
                     ValidIssuer = issuer,
                     ValidAudience = audience,
-                    ValidateAudience = true
-
-
+                    ValidateAudience = true,
                 };
             });
             return builder;
-
-
-
         }
-
-
-
     }
 }
